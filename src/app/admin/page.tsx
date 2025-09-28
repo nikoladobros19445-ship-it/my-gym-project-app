@@ -14,28 +14,35 @@ interface BookingWithUser {
 }
 
 export default function AdminPage() {
+  // ✅ svi hook-ovi su odmah na vrhu
   const { user, role, loading } = useAuthContext();
   const [bookings, setBookings] = useState<BookingWithUser[]>([]);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [loadingBookings, setLoadingBookings] = useState(true);
 
-  if (loading) return <div>Loading…</div>;
-  if (!user || role !== 'admin') redirect('/login');
+  // 🔹 prebacili smo redirect u useEffect da bismo izbegli pozivanje pre hook-ova
+  useEffect(() => {
+    if (!loading && (!user || role !== 'admin')) {
+      redirect('/login');
+    }
+  }, [loading, user, role]);
 
   useEffect(() => {
+    if (loading) return; // čekamo da se auth učita
+
     const fetchBookings = async () => {
       setLoadingBookings(true);
 
-      // 1️⃣ Get all users and map their uid -> email
+      // 1️⃣ mapa userId -> email
       const usersSnap = await getDocs(collection(db, 'users'));
       const userMap: Record<string, string> = {};
       usersSnap.forEach(d => {
         const data = d.data() as { email?: string };
-        if (data.email) userMap[d.id] = data.email!;
+        if (data.email) userMap[d.id] = data.email;
       });
 
-      // 2️⃣ Get all bookings ordered by date
+      // 2️⃣ svi termini, sortirani po datumu
       const q = query(collection(db, 'bookings'), orderBy('date'));
       const bookingsSnap = await getDocs(q);
 
@@ -54,7 +61,7 @@ export default function AdminPage() {
     };
 
     fetchBookings();
-  }, []);
+  }, [loading]);
 
   const cancelBooking = async (id: string) => {
     try {
@@ -69,6 +76,9 @@ export default function AdminPage() {
       setConfirmId(null);
     }
   };
+
+  // 🔹 dok čekamo auth prikazujemo Loading
+  if (loading) return <div>Loading…</div>;
 
   return (
     <div className="w-full max-w-5xl mx-auto mt-8">
