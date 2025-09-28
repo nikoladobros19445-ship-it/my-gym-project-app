@@ -1,64 +1,79 @@
 'use client';
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/firebase/config';
-import firebase_app from '@/firebase/config';
 
-export const auth = getAuth(firebase_app);
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '@/firebase/config';
 
-interface AuthContextType {
-  user: User | null;
-  role: 'user' | 'admin' | null;
-  loading: boolean;
-  logout: () => Promise<void>;
-}
+export default function SignUpPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
 
-export function AuthContextProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<'user' | 'admin' | null>(null);
-  const [loading, setLoading] = useState(true);
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      await setDoc(doc(db, 'users', result.user.uid), {
+        email,
+        role: 'user',
+        createdAt: new Date()
+      });
 
-  const logout = async () => {
-    await auth.signOut();
-    setUser(null);
-    setRole(null);
+      router.push('/');  // posle registracije vodi na početnu stranicu
+    } catch (err: any) {
+      setError(err.message || 'Registration failed');
+    }
   };
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async current => {
-      setUser(current);
-
-      if (current) {
-        // 🔑 Fetch the user's role from Firestore
-        const snap = await getDoc(doc(db, 'users', current.uid));
-        if (snap.exists()) {
-          const data = snap.data() as { role?: string };
-          setRole((data.role as 'user' | 'admin') ?? 'user');
-        } else {
-          setRole('user');
-        }
-      } else {
-        setRole(null);
-      }
-
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
   return (
-    <AuthContext.Provider value={{ user, role, loading, logout }}>
-      {loading ? <div>Loading…</div> : children}
-    </AuthContext.Provider>
+    <div className="flex justify-center items-center min-h-screen bg-gray-100 p-4 text-black">
+      <div className="w-full max-w-md bg-white rounded shadow p-6">
+        <h1 className="text-3xl font-bold mb-6 text-center">Sign up</h1>
+
+        {error && (
+          <div className="bg-red-100 text-red-700 px-3 py-2 mb-4 rounded">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block mb-1 font-medium">Email</label>
+            <input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block mb-1 font-medium">Password</label>
+            <input
+              id="password"
+              type="password"
+              required
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded"
+          >
+            Register
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }
-
-export const useAuthContext = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuthContext must be used within AuthContextProvider');
-  return ctx;
-};
