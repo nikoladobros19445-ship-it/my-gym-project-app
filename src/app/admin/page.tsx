@@ -14,27 +14,27 @@ interface BookingWithUser {
 }
 
 export default function AdminPage() {
-  // ✅ svi hook-ovi su odmah na vrhu
   const { user, role, loading } = useAuthContext();
   const [bookings, setBookings] = useState<BookingWithUser[]>([]);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [loadingBookings, setLoadingBookings] = useState(true);
 
-  // 🔹 prebacili smo redirect u useEffect da bismo izbegli pozivanje pre hook-ova
+  // redirect stavljamo u useEffect da bismo poštovali redosled hook-ova
   useEffect(() => {
     if (!loading && (!user || role !== 'admin')) {
       redirect('/login');
     }
   }, [loading, user, role]);
 
+  // dohvat rezervacija takođe u useEffect
   useEffect(() => {
     if (loading) return; // čekamo da se auth učita
 
     const fetchBookings = async () => {
       setLoadingBookings(true);
 
-      // 1️⃣ mapa userId -> email
+      // mapa userId -> email
       const usersSnap = await getDocs(collection(db, 'users'));
       const userMap: Record<string, string> = {};
       usersSnap.forEach(d => {
@@ -42,7 +42,7 @@ export default function AdminPage() {
         if (data.email) userMap[d.id] = data.email;
       });
 
-      // 2️⃣ svi termini, sortirani po datumu
+      // svi termini, sortirani po datumu
       const q = query(collection(db, 'bookings'), orderBy('date'));
       const bookingsSnap = await getDocs(q);
 
@@ -77,7 +77,7 @@ export default function AdminPage() {
     }
   };
 
-  // 🔹 dok čekamo auth prikazujemo Loading
+  // sada hook-ovi uvek budu pozvani pre uslovnog prikaza
   if (loading) return <div>Loading…</div>;
 
   return (
